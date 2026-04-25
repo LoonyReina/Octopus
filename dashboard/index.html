@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mmclaw dashboard</title>
+    <style>
+      :root {
+        --bg: #0e1014;
+        --panel: #181b21;
+        --border: #2a2f38;
+        --fg: #d8dde6;
+        --muted: #8a93a3;
+        --ok: #4ade80;
+        --bad: #f87171;
+        --warn: #fbbf24;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 system-ui, sans-serif; }
+      body {
+        display: grid;
+        grid-template-rows: 40px 1fr 140px;
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+          "status status"
+          "ui     cam"
+          "log    log";
+        height: 100vh;
+        gap: 6px;
+        padding: 6px;
+      }
+      header { grid-area: status; }
+      #ui-wrap   { grid-area: ui; }
+      #cam-wrap  { grid-area: cam; }
+      #log-wrap  { grid-area: log; }
+      header, #ui-wrap, #cam-wrap, #log-wrap {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 0 12px;
+        font-size: 12px;
+      }
+      header .item { display: flex; align-items: center; gap: 6px; }
+      header .dot {
+        width: 9px; height: 9px; border-radius: 50%;
+        background: var(--muted);
+        box-shadow: 0 0 6px currentColor;
+      }
+      header .dot.ok  { background: var(--ok);  color: var(--ok);  }
+      header .dot.bad { background: var(--bad); color: var(--bad); }
+      header .dot.warn{ background: var(--warn);color: var(--warn);}
+      header .label { color: var(--muted); }
+      header .value { color: var(--fg); }
+      header .title { font-weight: 600; margin-right: auto; }
+      #ui-wrap, #cam-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #ui-wrap iframe, #cam-wrap img {
+        width: 100%; height: 100%; border: 0; display: block;
+        background: #000;
+      }
+      .placeholder {
+        color: var(--muted); font-size: 13px; text-align: center; padding: 20px;
+      }
+      .panel-tag {
+        position: absolute; top: 6px; left: 8px;
+        font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;
+        color: var(--muted); background: rgba(0,0,0,0.55); padding: 2px 6px; border-radius: 3px;
+        pointer-events: none;
+      }
+      #log {
+        height: 100%; overflow-y: auto; padding: 8px 12px;
+        font: 11px/1.45 ui-monospace, "Cascadia Mono", Consolas, monospace;
+        white-space: pre-wrap;
+      }
+      #log .l-ok  { color: var(--ok); }
+      #log .l-bad { color: var(--bad); }
+      #log .l-info{ color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="title">mmclaw dashboard</span>
+      <span class="item">
+        <span class="dot" id="dot-ui"></span>
+        <span class="label">openclaw :18789</span>
+        <span class="value" id="val-ui">checking...</span>
+      </span>
+      <span class="item">
+        <span class="dot" id="dot-cam"></span>
+        <span class="label">camera :8080</span>
+        <span class="value" id="val-cam">unknown</span>
+      </span>
+      <span class="item">
+        <span class="label">last sync</span>
+        <span class="value" id="val-sync">unknown</span>
+      </span>
+      <span class="item">
+        <span class="label">checked</span>
+        <span class="value" id="val-tick">-</span>
+      </span>
+    </header>
+
+    <section id="ui-wrap">
+      <span class="panel-tag">openclaw (mmclaw-dev container) @ :18789 via ssh tunnel</span>
+      <iframe id="ui-frame" src="http://localhost:18789/" referrerpolicy="no-referrer"></iframe>
+    </section>
+
+    <section id="cam-wrap">
+      <span class="panel-tag">camera mjpeg @ :8080/stream via ssh tunnel</span>
+      <img
+        id="cam"
+        alt="camera"
+        src="http://localhost:8080/stream"
+        onerror="this.style.display='none'; document.getElementById('cam-fallback').style.display='block';"
+      />
+      <div id="cam-fallback" class="placeholder" style="display:none;">
+        Camera stream not reachable on http://localhost:8080/stream. Start the
+        cam_stream service on the board (services/cam_stream/run.sh) and make
+        sure your SSH tunnel forwards port 8080.
+      </div>
+    </section>
+
+    <section id="log-wrap">
+      <div id="log"></div>
+    </section>
+
+    <script>
+      const log = document.getElementById('log');
+      const MAX = 200;
+      function emit(cls, msg) {
+        const ts = new Date().toLocaleTimeString();
+        const div = document.createElement('div');
+        div.className = 'l-' + cls;
+        div.textContent = `[${ts}] ${msg}`;
+        log.prepend(div);
+        while (log.childNodes.length > MAX) log.removeChild(log.lastChild);
+      }
+      function setDot(id, cls) {
+        const d = document.getElementById(id);
+        d.classList.remove('ok','bad','warn');
+        if (cls) d.classList.add(cls);
+      }
+
+      async function probe(url, timeoutMs) {
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), timeoutMs);
+        try {
+          // Use no-cors to avoid throwing on missing CORS headers; we only need
+          // to know whether the socket accepted the connection.
+          const r = await fetch(url, { method: 'GET', mode: 'no-cors', signal: ctl.signal });
+          clearTimeout(t);
+          return { ok: true, status: r.status || 0 };
+        } catch (e) {
+          clearTimeout(t);
+          return { ok: false, error: String(e && e.message || e) };
+        }
+      }
+
+      async function tick() {
+        document.getElementById('val-tick').textContent = new Date().toLocaleTimeString();
+        const ui = await probe('http://localhost:18789/healthz', 4000);
+        document.getElementById('val-ui').textContent = ui.ok ? 'reachable' : 'down';
+        setDot('dot-ui', ui.ok ? 'ok' : 'bad');
+        emit(ui.ok ? 'ok' : 'bad', `openclaw :18789 ${ui.ok ? 'reachable' : 'unreachable: ' + ui.error}`);
+
+        const cam = await probe('http://localhost:8080/health', 2000);
+        document.getElementById('val-cam').textContent = cam.ok ? 'streaming' : 'offline';
+        setDot('dot-cam', cam.ok ? 'ok' : 'warn');
+
+        // Try to read a sync stamp file if a sidecar is generating one.
+        try {
+          const r = await fetch('./.last-sync', { cache: 'no-store' });
+          if (r.ok) document.getElementById('val-sync').textContent = (await r.text()).trim();
+        } catch (_) {}
+      }
+
+      tick();
+      setInterval(tick, 5000);
+      emit('info', 'dashboard loaded — make sure the SSH tunnel is up (see README.md).');
+    </script>
+  </body>
+</html>

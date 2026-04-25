@@ -1,0 +1,97 @@
+# --------- secrets / credentials (CRITICAL — never commit) ---------
+# (NOTE: .gitignore does NOT support inline `#` comments — must be on own line)
+.env
+**/.env
+*.env
+# tencent SecretId/SecretKey lives in sdk.md
+**/sdk.md
+# DashScope api key + url lives in ref.md
+plugins/mm_embedding/ref.md
+# may contain provider api keys
+**/openclaw.json
+**/openclaw.json.bak
+**/openclaw.json.last-good
+**/openclaw.json.clobbered.*
+**/auth-store.json
+**/identity/
+**/exec-approvals.json
+
+# --------- private keys / SSH ---------
+**/id_rsa
+**/id_rsa.pub
+**/known_hosts*
+**/*.pem
+**/*.key
+
+# --------- build artifacts / caches ---------
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+dist-runtime/
+.openclaw/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.tsbuildinfo
+*.tsbuildinfo
+*.test.ts.snap
+.runtime-postbuildstamp
+.dev-state
+.pnpm-store/
+.next/
+
+# --------- large media / test fixtures ---------
+*.wav
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.m4v
+plugins/mm_gpt/test_videos/
+plugins/mm_gpt/frames/
+plugins/mm_gpt/test1.png
+plugins/mm_gpt/test2.png
+plugins/mm_gpt/test3.png
+plugins/mm_gpt/multi_image_test_results.json
+plugins/mm_gpt/video_test_results*.json
+plugins/mm_embedding/test_assets/
+plugins/mm_embedding/test_matrix_results.json
+
+# --------- runtime state / logs ---------
+*.log
+tmp/
+.tmp/
+.artifacts/
+coverage/
+.idea/
+.vscode/
+.DS_Store
+.serena/
+.local/
+.agent/
+.claude/
+
+# --------- platform-specific ---------
+.gradle/
+.cxx/
+.kotlin/
+.swiftpm/
+.derivedData/
+.stfolder
+Swabble/
+
+# --------- top-level only (matches sync.py exclude policy) ---------
+/bin/
+/Core/
+/vendor/
+/.worktrees/
+/.ant-colony/
+/memory/
+/local/
+/analysis/
+
+# --------- worktree / dashboard runtime stamps ---------
+dashboard/.last-sync
